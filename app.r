@@ -56,6 +56,10 @@ server <- function(input, output, session){
 	# Extract site locations
 	sites=master_site[master_site$IR_MLID %in% daily_values$IR_MLID,]
 	
+	# Match AU polygons to those present in sites
+	data(au_poly)
+	au_poly=au_poly[au_poly$ASSESS_ID %in% sites$ASSESS_ID,]
+	
 	# Extract 30 & 7 d means, expand to all site, date, & name combinations
 	d307means=HFDO_assessed$thirty_seven_means
 	d307means$mid_date=(d307means$start_date+(d307means$AsmntAggPeriod)/2)
@@ -83,7 +87,7 @@ server <- function(input, output, session){
 
     session$onFlushed(once = T, function() {
 		output$map <- leaflet::renderLeaflet({
-			buildMap(sites=sites, plot_polys=TRUE)
+			buildMap(sites=sites,au_poly=au_poly)
 		})
     })
 	
