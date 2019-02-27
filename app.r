@@ -4,8 +4,6 @@ library(magrittr)
 library(plotly)
 
 
-
-
 ui <-fluidPage(
 	# Header
 	headerPanel(title=tags$a(href='https://deq.utah.gov/division-water-quality/',tags$img(src='deq_dwq_logo.png', height = 75, width = 75*2.85)),
@@ -46,7 +44,7 @@ server <- function(input, output, session){
 	#})
 
 	# Load data
-	load("./data/assessed_hfdo.rdata")
+	load("data/assessed_hfdo.Rdata")
 	master_site=read.csv("./data/wqp_master_site_file.csv")
 	
 	# Extract raw data points
