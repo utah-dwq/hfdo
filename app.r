@@ -5,8 +5,9 @@ library(plotly)
 
 
 ui <-fluidPage(
+	
 	# Header
-	headerPanel(title=tags$a(href='https://deq.utah.gov/division-water-quality/',tags$img(src='deq_dwq_logo.png', height = 75, width = 75*2.85)),
+	headerPanel(title=tags$a(href='https://deq.utah.gov/division-water-quality/',tags$img(src='deq_dwq_logo.png', height = 75, width = 75*2.85), target="_blank"),
 		windowTitle="High frequency data dashboard"),
 
 	# Title
@@ -138,6 +139,7 @@ server <- function(input, output, session){
 								
 				setProgress(value=0.9)
 				plot_ly(raw_data_plot, x=~datetime, source="a") %>%
+					config(displaylogo = FALSE, collaborate = FALSE) %>% 
 					#add_trace(type='scatter', y = ~IR_Value, name = '"Raw data', mode = 'lines+markers') %>%
 					add_lines(y=~IR_Value, name="Raw data", line=list(color = 'rgb(180, 180, 180, 0.5)')) %>%
 					add_markers(data=daily_means, x=~ActivityStartDate, y=~IR_Value, name="Daily mean", marker=list(color = 'rgba(45, 100, 185,0.5)', line=list(color = 'rgb(45, 100, 185)', width=2))) %>%
