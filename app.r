@@ -41,14 +41,14 @@ server <- function(input, output, session){
 	#})
 
 	# Load data
-	load("data/assessed_hfdo.Rdata")
-	master_site=read.csv("./data/wqp_master_site_file.csv")
+	load("data/all_hfdo_assessments.Rdata")
+	master_site=readxl::read_excel("./data/master_site_file_08272019_2020IR_final.xlsx")
 	
 	# Extract raw data points
 	raw_data=HFDO_assessed$data
 	raw_data$datetime=as.POSIXct(paste(raw_data$ActivityStartDate, raw_data$ActivityStartTime.Time), format="%Y-%m-%d %H:%M")
 	# Extract daily values
-	daily_values=HFDO_assessed$daily_values
+	daily_values=all_daily_values
 	
 	# Extract site locations
 	sites=master_site[master_site$IR_MLID %in% daily_values$IR_MLID,]
@@ -58,7 +58,7 @@ server <- function(input, output, session){
 	au_poly=au_poly[au_poly$ASSESS_ID %in% sites$ASSESS_ID,]
 	
 	# Extract 30 & 7 d means, expand to all site, date, & name combinations
-	d307means=HFDO_assessed$thirty_seven_means
+	d307means=all_thirty_seven_means
 	d307means$mid_date=(d307means$start_date+(d307means$AsmntAggPeriod)/2)
 	d307means$name=paste(d307means$AsmntAggPeriod,d307means$AsmntAggPeriodUnit,d307means$AsmntAggFun)
 	d307means=unique(d307means[,c("IR_MLID","mid_date","name","mean")])
