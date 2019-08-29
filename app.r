@@ -42,16 +42,13 @@ server <- function(input, output, session){
 
 	# Load data
 	load("data/all_hfdo_assessments.Rdata")
-	master_site=readxl::read_excel("./data/master_site_file_08272019_2020IR_final.xlsx")
+	master_site=readxl::read_excel("./data/master_site_file_08292019_2020IR_final.xlsx")
 	
-	# Extract raw data points
-	raw_data=HFDO_assessed$data
-	raw_data$datetime=as.POSIXct(paste(raw_data$ActivityStartDate, raw_data$ActivityStartTime.Time), format="%Y-%m-%d %H:%M")
 	# Extract daily values
 	daily_values=all_daily_values
 	
 	# Extract site locations
-	sites=master_site[master_site$IR_MLID %in% daily_values$IR_MLID,]
+	sites=master_site[master_site$MonitoringLocationIdentifier %in% daily_values$IR_MLID,]
 	
 	# Match AU polygons to those present in sites
 	data(au_poly)
@@ -62,13 +59,14 @@ server <- function(input, output, session){
 	d307means$mid_date=(d307means$start_date+(d307means$AsmntAggPeriod)/2)
 	d307means$name=paste(d307means$AsmntAggPeriod,d307means$AsmntAggPeriodUnit,d307means$AsmntAggFun)
 	d307means=unique(d307means[,c("IR_MLID","mid_date","name","mean")])
-	mid_date=(seq(min(raw_data$ActivityStartDate), max(raw_data$ActivityStartDate), 1))
-	mid_date=data.frame(mid_date)
-	mid_date=merge(mid_date,sites$IR_MLID,all=T)
-	names(mid_date)[names(mid_date)=="y"]="IR_MLID"
-	mid_date=merge(mid_date, unique(d307means$name), all=T)
-	names(mid_date)[names(mid_date)=="y"]="name"
-	d307means=merge(mid_date, d307means , all=T)
+	
+	# mid_date=(seq(min(raw_data$ActivityStartDate), max(raw_data$ActivityStartDate), 1))
+	# mid_date=data.frame(mid_date)
+	# mid_date=merge(mid_date,sites$IR_MLID,all=T)
+	# names(mid_date)[names(mid_date)=="y"]="IR_MLID"
+	# mid_date=merge(mid_date, unique(d307means$name), all=T)
+	# names(mid_date)[names(mid_date)=="y"]="name"
+	# d307means1=merge(mid_date, d307means , all=T)
 
 	
 	# Empty reactive values object
@@ -101,11 +99,19 @@ server <- function(input, output, session){
 	# Grab data & available dates for selected site
 	observe({
 		req(reactive_objects$sel_mlid)
-		reactive_objects$raw_data_sel=raw_data[raw_data$IR_MLID %in% reactive_objects$sel_mlid,]
-		reactive_objects$d307means_sel=d307means[d307means$IR_MLID %in% reactive_objects$sel_mlid,]
-		reactive_objects$daily_values_sel=daily_values[daily_values$IR_MLID %in% reactive_objects$sel_mlid,]
-		reactive_objects$date_range=c(min(reactive_objects$raw_data_sel$ActivityStartDate),max(reactive_objects$raw_data_sel$ActivityStartDate))
-	})
+	  withProgress(message = "Generating raw data", value = 0.1,{
+	    raw_df = do.call(rbind.data.frame, all_raw_data[lapply(all_raw_data, function(x) reactive_objects$sel_mlid %in% unique(x$IR_MLID))==TRUE])
+	    setProgress(message = "Subsetting to selected MLID", value = 0.6)
+	    raw_data = raw_df[raw_df$IR_MLID==reactive_objects$sel_mlid,]
+	    raw_data$datetime=as.POSIXct(paste(raw_data$ActivityStartDate, raw_data$ActivityStartTime.Time), format="%Y-%m-%d %H:%M")
+	    setProgress(message = "Creating reactive objects", value = 0.8)
+	    reactive_objects$raw_data_sel = raw_data
+	    #reactive_objects$raw_data_sel=raw_data[raw_data$IR_MLID %in% reactive_objects$sel_mlid,]
+	    reactive_objects$d307means_sel=d307means[d307means$IR_MLID %in% reactive_objects$sel_mlid,]
+	    reactive_objects$daily_values_sel=daily_values[daily_values$IR_MLID %in% reactive_objects$sel_mlid,]
+	    reactive_objects$date_range=c(min(reactive_objects$raw_data_sel$ActivityStartDate),max(reactive_objects$raw_data_sel$ActivityStartDate))
+	  })
+	  	})
 	
 	## Date slider selection
 	#output$date_slider <- renderUI({
@@ -118,13 +124,16 @@ server <- function(input, output, session){
 	output$hf_plot=renderPlotly({
 		req(reactive_objects$daily_values_sel)
 		isolate({
-			withProgress(message="Generating raw data...", value=0.25,{
+			withProgress(message="Prepping raw data...", value=0.25,{
 			raw_data_plot=unique(reactive_objects$raw_data_sel[,c("IR_MLID","ActivityStartDate","datetime","IR_Value")])
 				raw_data_plot$key=raw_data_plot$datetime
 				setProgress(message="Drawing plot...", value=0.65)
 				raw_data_plot=raw_data_plot[order(raw_data_plot$datetime),]	
-				criteria=unique(reactive_objects$raw_data_sel[,c("IR_MLID","ActivityStartDate","DailyAggFun","NumericCriterion","AsmntAggPeriod","AsmntAggPeriodUnit","BeneficialUse")])
-				criteria$name=paste(criteria$BeneficialUse,criteria$AsmntAggPeriod,criteria$AsmntAggPeriodUnit,criteria$DailyAggFun, "criterion")
+				criteria=unique(reactive_objects$raw_data_sel[,c("IR_MLID","ActivityStartDate","DailyAggFun","NumericCriterion","AsmntAggPeriod","AsmntAggPeriodUnit","ParameterQualifier","BeneficialUse")])
+				criteria$ParameterQualifier[criteria$ParameterQualifier=="early life stages are present"] = "ELS"
+				criteria$ParameterQualifier[criteria$ParameterQualifier=="other life stages present"] = "OLS"
+				criteria$ParameterQualifier[is.na(criteria$ParameterQualifier)] = ""
+				criteria$name=paste(criteria$BeneficialUse,criteria$AsmntAggPeriod,criteria$AsmntAggPeriodUnit,criteria$DailyAggFun, criteria$ParameterQualifier,"criterion")
 				criteria$NumericCriterion=as.numeric(criteria$NumericCriterion)
 				reactive_objects$criteria=criteria
 				reactive_objects$applicable_crit=criteria
