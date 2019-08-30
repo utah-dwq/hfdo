@@ -234,6 +234,11 @@ server <- function(input, output, session){
 			pct_exc=exc/cnt *100
 			Attribute[Attribute=="Daily min"]="1 day min"
 			crit=name
+			pq = ""
+			pq[grepl("ELS", table3_data$crit)] = "Early Life Stages"
+			pq[grepl("OLS", table3_data$crit)] = "Other Life Stages"
+			crit=gsub(" ELS criterion","",crit)
+			crit=gsub(" OLS criterion","",crit)
 			crit=gsub(" criterion","",crit)
 			crit=substring(crit, 4)
 			keep=ifelse(Attribute==crit,1,0)
