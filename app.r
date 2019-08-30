@@ -267,7 +267,7 @@ server <- function(input, output, session){
 		table2_data=reactive_objects$table2_data
 		table2=reshape2::dcast(table2_data, Attribute~Criterion, value.var="pct_exc")
 		DT::datatable(table2, selection='none', rownames=F,
-			options = list(scrollY = '250px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
+			options = list(scrollY = '200px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
 				DT::formatRound(c(2:dim(table2)[2]), 2)
 	})
 	
@@ -277,7 +277,7 @@ server <- function(input, output, session){
 		table3_data=reactive_objects$table3_data
 		table3=reshape2::dcast(table3_data, Attribute~name, value.var="pct_exc")
 		DT::datatable(table3, selection='none', rownames=F,
-			options = list(scrollY = '250px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
+			options = list(scrollY = '200px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
 				DT::formatRound(c(2:dim(table3)[2]), 2)
 	})
 
