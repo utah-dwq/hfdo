@@ -207,7 +207,8 @@ server <- function(input, output, session){
 		names(d307means)[names(d307means)=="mean"]="value"
 		table1_data=na.omit(rbind(dv,d307means))
 		names(table1_data)[names(table1_data)=="name"]="Attribute"
-		
+		table1_data <<- table1_data
+		criteria <<- reactive_objects$criteria
 		t2data=table1_data
 		criteria=reactive_objects$criteria
 		t2criteria=unique(criteria$NumericCriterion)
@@ -225,8 +226,8 @@ server <- function(input, output, session){
 		t3criteria=unique(criteria[,c("name","NumericCriterion")])
 		t3data=merge(t3data,t3criteria, all.x=T)
 		t3data$exc=ifelse(t3data$value<t3data$NumericCriterion,1,0)
-		exc=aggregate(exc~name+Attribute, t3data, FUN='sum')
-		cnt=aggregate(exc~name+Attribute, t3data, FUN='length')
+		exc=aggregate(exc~name+Attribute+NumericCriterion, t3data, FUN='sum')
+		cnt=aggregate(exc~name+Attribute+NumericCriterion, t3data, FUN='length')
 		names(cnt)[names(cnt)=="exc"]="cnt"
 		table3_data=merge(exc,cnt)
 		
@@ -275,6 +276,7 @@ server <- function(input, output, session){
 	output$table3=DT::renderDataTable({
 		req(reactive_objects$table3_data)
 		table3_data=reactive_objects$table3_data
+		table3_data$name = paste0(table3_data$name,"-",table3_data$NumericCriterion)
 		table3=reshape2::dcast(table3_data, Attribute~name, value.var="pct_exc")
 		DT::datatable(table3, selection='none', rownames=F,
 			options = list(scrollY = '200px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
