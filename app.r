@@ -41,34 +41,32 @@ server <- function(input, output, session){
 	#})
 
 	# Load data
-	load("data/assessed_hfdo.Rdata")
-	master_site=read.csv("./data/wqp_master_site_file.csv")
+	load("data/all_hfdo_assessments.Rdata")
+	master_site=readxl::read_excel("./data/master_site_file_08292019_2020IR_final.xlsx")
 	
-	# Extract raw data points
-	raw_data=HFDO_assessed$data
-	raw_data$datetime=as.POSIXct(paste(raw_data$ActivityStartDate, raw_data$ActivityStartTime.Time), format="%Y-%m-%d %H:%M")
 	# Extract daily values
-	daily_values=HFDO_assessed$daily_values
+	daily_values=all_daily_values
 	
 	# Extract site locations
-	sites=master_site[master_site$IR_MLID %in% daily_values$IR_MLID,]
+	sites=master_site[master_site$MonitoringLocationIdentifier %in% daily_values$IR_MLID,]
 	
 	# Match AU polygons to those present in sites
 	data(au_poly)
 	au_poly=au_poly[au_poly$ASSESS_ID %in% sites$ASSESS_ID,]
 	
 	# Extract 30 & 7 d means, expand to all site, date, & name combinations
-	d307means=HFDO_assessed$thirty_seven_means
+	d307means=all_thirty_seven_means
 	d307means$mid_date=(d307means$start_date+(d307means$AsmntAggPeriod)/2)
 	d307means$name=paste(d307means$AsmntAggPeriod,d307means$AsmntAggPeriodUnit,d307means$AsmntAggFun)
 	d307means=unique(d307means[,c("IR_MLID","mid_date","name","mean")])
-	mid_date=(seq(min(raw_data$ActivityStartDate), max(raw_data$ActivityStartDate), 1))
-	mid_date=data.frame(mid_date)
-	mid_date=merge(mid_date,sites$IR_MLID,all=T)
-	names(mid_date)[names(mid_date)=="y"]="IR_MLID"
-	mid_date=merge(mid_date, unique(d307means$name), all=T)
-	names(mid_date)[names(mid_date)=="y"]="name"
-	d307means=merge(mid_date, d307means , all=T)
+	
+	# mid_date=(seq(min(raw_data$ActivityStartDate), max(raw_data$ActivityStartDate), 1))
+	# mid_date=data.frame(mid_date)
+	# mid_date=merge(mid_date,sites$IR_MLID,all=T)
+	# names(mid_date)[names(mid_date)=="y"]="IR_MLID"
+	# mid_date=merge(mid_date, unique(d307means$name), all=T)
+	# names(mid_date)[names(mid_date)=="y"]="name"
+	# d307means1=merge(mid_date, d307means , all=T)
 
 	
 	# Empty reactive values object
@@ -101,11 +99,19 @@ server <- function(input, output, session){
 	# Grab data & available dates for selected site
 	observe({
 		req(reactive_objects$sel_mlid)
-		reactive_objects$raw_data_sel=raw_data[raw_data$IR_MLID %in% reactive_objects$sel_mlid,]
-		reactive_objects$d307means_sel=d307means[d307means$IR_MLID %in% reactive_objects$sel_mlid,]
-		reactive_objects$daily_values_sel=daily_values[daily_values$IR_MLID %in% reactive_objects$sel_mlid,]
-		reactive_objects$date_range=c(min(reactive_objects$raw_data_sel$ActivityStartDate),max(reactive_objects$raw_data_sel$ActivityStartDate))
-	})
+	  withProgress(message = "Generating raw data", value = 0.1,{
+	    raw_df = do.call(rbind.data.frame, all_raw_data[lapply(all_raw_data, function(x) reactive_objects$sel_mlid %in% unique(x$IR_MLID))==TRUE])
+	    setProgress(message = "Subsetting to selected MLID", value = 0.6)
+	    raw_data = raw_df[raw_df$IR_MLID==reactive_objects$sel_mlid,]
+	    raw_data$datetime=as.POSIXct(paste(raw_data$ActivityStartDate, raw_data$ActivityStartTime.Time), format="%Y-%m-%d %H:%M")
+	    setProgress(message = "Creating reactive objects", value = 0.8)
+	    reactive_objects$raw_data_sel = raw_data
+	    #reactive_objects$raw_data_sel=raw_data[raw_data$IR_MLID %in% reactive_objects$sel_mlid,]
+	    reactive_objects$d307means_sel=d307means[d307means$IR_MLID %in% reactive_objects$sel_mlid,]
+	    reactive_objects$daily_values_sel=daily_values[daily_values$IR_MLID %in% reactive_objects$sel_mlid,]
+	    reactive_objects$date_range=c(min(reactive_objects$raw_data_sel$ActivityStartDate),max(reactive_objects$raw_data_sel$ActivityStartDate))
+	  })
+	  	})
 	
 	## Date slider selection
 	#output$date_slider <- renderUI({
@@ -118,13 +124,16 @@ server <- function(input, output, session){
 	output$hf_plot=renderPlotly({
 		req(reactive_objects$daily_values_sel)
 		isolate({
-			withProgress(message="Generating raw data...", value=0.25,{
+			withProgress(message="Prepping raw data...", value=0.25,{
 			raw_data_plot=unique(reactive_objects$raw_data_sel[,c("IR_MLID","ActivityStartDate","datetime","IR_Value")])
 				raw_data_plot$key=raw_data_plot$datetime
 				setProgress(message="Drawing plot...", value=0.65)
 				raw_data_plot=raw_data_plot[order(raw_data_plot$datetime),]	
-				criteria=unique(reactive_objects$raw_data_sel[,c("IR_MLID","ActivityStartDate","DailyAggFun","NumericCriterion","AsmntAggPeriod","AsmntAggPeriodUnit","BeneficialUse")])
-				criteria$name=paste(criteria$BeneficialUse,criteria$AsmntAggPeriod,criteria$AsmntAggPeriodUnit,criteria$DailyAggFun, "criterion")
+				criteria=unique(reactive_objects$raw_data_sel[,c("IR_MLID","ActivityStartDate","DailyAggFun","NumericCriterion","AsmntAggPeriod","AsmntAggPeriodUnit","ParameterQualifier","BeneficialUse")])
+				criteria$ParameterQualifier[criteria$ParameterQualifier=="early life stages are present"] = "ELS"
+				criteria$ParameterQualifier[criteria$ParameterQualifier=="other life stages present"] = "OLS"
+				criteria$ParameterQualifier[is.na(criteria$ParameterQualifier)] = ""
+				criteria$name=paste(criteria$BeneficialUse,criteria$AsmntAggPeriod,criteria$AsmntAggPeriodUnit,criteria$DailyAggFun, criteria$ParameterQualifier,"criterion")
 				criteria$NumericCriterion=as.numeric(criteria$NumericCriterion)
 				reactive_objects$criteria=criteria
 				reactive_objects$applicable_crit=criteria
@@ -198,7 +207,8 @@ server <- function(input, output, session){
 		names(d307means)[names(d307means)=="mean"]="value"
 		table1_data=na.omit(rbind(dv,d307means))
 		names(table1_data)[names(table1_data)=="name"]="Attribute"
-		
+		table1_data <<- table1_data
+		criteria <<- reactive_objects$criteria
 		t2data=table1_data
 		criteria=reactive_objects$criteria
 		t2criteria=unique(criteria$NumericCriterion)
@@ -216,8 +226,8 @@ server <- function(input, output, session){
 		t3criteria=unique(criteria[,c("name","NumericCriterion")])
 		t3data=merge(t3data,t3criteria, all.x=T)
 		t3data$exc=ifelse(t3data$value<t3data$NumericCriterion,1,0)
-		exc=aggregate(exc~name+Attribute, t3data, FUN='sum')
-		cnt=aggregate(exc~name+Attribute, t3data, FUN='length')
+		exc=aggregate(exc~name+Attribute+NumericCriterion, t3data, FUN='sum')
+		cnt=aggregate(exc~name+Attribute+NumericCriterion, t3data, FUN='length')
 		names(cnt)[names(cnt)=="exc"]="cnt"
 		table3_data=merge(exc,cnt)
 		
@@ -225,6 +235,11 @@ server <- function(input, output, session){
 			pct_exc=exc/cnt *100
 			Attribute[Attribute=="Daily min"]="1 day min"
 			crit=name
+			pq = ""
+			pq[grepl("ELS", table3_data$crit)] = "Early Life Stages"
+			pq[grepl("OLS", table3_data$crit)] = "Other Life Stages"
+			crit=gsub(" ELS criterion","",crit)
+			crit=gsub(" OLS criterion","",crit)
 			crit=gsub(" criterion","",crit)
 			crit=substring(crit, 4)
 			keep=ifelse(Attribute==crit,1,0)
@@ -253,7 +268,7 @@ server <- function(input, output, session){
 		table2_data=reactive_objects$table2_data
 		table2=reshape2::dcast(table2_data, Attribute~Criterion, value.var="pct_exc")
 		DT::datatable(table2, selection='none', rownames=F,
-			options = list(scrollY = '250px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
+			options = list(scrollY = '200px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
 				DT::formatRound(c(2:dim(table2)[2]), 2)
 	})
 	
@@ -261,9 +276,10 @@ server <- function(input, output, session){
 	output$table3=DT::renderDataTable({
 		req(reactive_objects$table3_data)
 		table3_data=reactive_objects$table3_data
+		table3_data$name = paste0(table3_data$name,"-",table3_data$NumericCriterion)
 		table3=reshape2::dcast(table3_data, Attribute~name, value.var="pct_exc")
 		DT::datatable(table3, selection='none', rownames=F,
-			options = list(scrollY = '250px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
+			options = list(scrollY = '200px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't')) %>%
 				DT::formatRound(c(2:dim(table3)[2]), 2)
 	})
 
