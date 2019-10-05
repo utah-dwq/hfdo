@@ -21,9 +21,10 @@ ui <-fluidPage(
 		),
 		column(8, h4("Plot window"),plotlyOutput("hf_plot"),
 				tabsetPanel(id='tabs',
-					tabPanel("Summary stats", column(6, div(DT::dataTableOutput("table1"), style = "font-size:100%"))),
-					tabPanel("Numeric criteria % exc", column(6, div(DT::dataTableOutput("table2"), style = "font-size:100%"))),					
-					tabPanel("Criteria % exc", column(6, div(DT::dataTableOutput("table3"), style = "font-size:100%")))
+				  tabPanel("Assessments", column(12, div(DT::dataTableOutput("table0"), style = "font-size:100%"))),
+					tabPanel("Summary stats", column(12, div(DT::dataTableOutput("table1"), style = "font-size:100%"))),
+					tabPanel("Numeric criteria % exc", column(12, div(DT::dataTableOutput("table2"), style = "font-size:100%"))),					
+					tabPanel("Criteria % exc", column(12, div(DT::dataTableOutput("table3"), style = "font-size:100%")))
 				)
 		)
 	)
@@ -43,6 +44,16 @@ server <- function(input, output, session){
 	# Load data
 	load("data/all_hfdo_assessments.Rdata")
 	master_site=readxl::read_excel("./data/master_site_file_08292019_2020IR_final.xlsx")
+	
+	# Roll up to site
+	site_use_asmt = all_HFDO_asmnts[,c("IR_MLID","BeneficialUse","IR_Cat")]
+	site_use_asmt$rank = 1
+	site_use_asmt$rank[site_use_asmt$IR_Cat=="NS"] = 2
+	
+	site_use_agg = aggregate(rank~IR_MLID+BeneficialUse, data = site_use_asmt, FUN = max)
+	names(site_use_agg)[names(site_use_agg)=="rank"] = "IR_Cat"
+	site_use_agg$IR_Cat[site_use_agg$IR_Cat==1] = "FS"
+	site_use_agg$IR_Cat[site_use_agg$IR_Cat==2] = "NS"
 	
 	# Extract daily values
 	daily_values=all_daily_values
@@ -207,8 +218,8 @@ server <- function(input, output, session){
 		names(d307means)[names(d307means)=="mean"]="value"
 		table1_data=na.omit(rbind(dv,d307means))
 		names(table1_data)[names(table1_data)=="name"]="Attribute"
-		table1_data <<- table1_data
-		criteria <<- reactive_objects$criteria
+		#table1_data <<- table1_data
+		#criteria <<- reactive_objects$criteria
 		t2data=table1_data
 		criteria=reactive_objects$criteria
 		t2criteria=unique(criteria$NumericCriterion)
@@ -242,13 +253,27 @@ server <- function(input, output, session){
 			crit=gsub(" OLS criterion","",crit)
 			crit=gsub(" criterion","",crit)
 			crit=substring(crit, 4)
+			crit=gsub("min ","min",crit)
+			crit=gsub("mean ","mean",crit)
 			keep=ifelse(Attribute==crit,1,0)
-		})
+			})
+		
+		data_0 = site_use_agg[site_use_agg$IR_MLID==reactive_objects$sel_mlid,]
+		table0_data = reshape2::dcast(data_0, IR_MLID~BeneficialUse, value.var = "IR_Cat")
 		
 		table3_data=table3_data[table3_data$keep==1,]
+		reactive_objects$table0_data=table0_data
 		reactive_objects$table1_data=table1_data
 		reactive_objects$table2_data=table2_data
 		reactive_objects$table3_data=table3_data
+	})
+	
+	# Table 0
+	output$table0=DT::renderDataTable({
+	  req(reactive_objects$table0_data)
+	  reactive_objects$table0_data %>%
+	    DT::datatable(selection='none', rownames=F,
+	                  options = list(scrollY = '250px', paging = FALSE, scrollX = TRUE, searching=F, dom = 't'))
 	})
 
 	# Table 1
