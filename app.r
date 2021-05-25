@@ -43,7 +43,7 @@ server <- function(input, output, session){
 
 	# Load data
 	load("data/all_hfdo_assessments.Rdata")
-	master_site=readxl::read_excel("./data/master_site_file_08292019_2020IR_final.xlsx")
+	master_site=readxl::read_excel("./data/IR_translation_workbook_working_2022.xlsx", sheet = "masterSiteTable")
 	
 	# Roll up to site
 	site_use_asmt = all_HFDO_asmnts[,c("IR_MLID","BeneficialUse","IR_Cat")]
